@@ -50,3 +50,31 @@ executável contra `config/slus_01411/target.yaml`, exige os arquivos usados pel
 verifica que seus últimos setores existem. A imagem CloneCD pode ter outro hash do disco
 de referência por diferenças nos setores RAW, mesmo quando o executável é idêntico.
 Os arquivos `game/`, `tmp/`, ROMs, imagens RAW e arquivos RAR são ignorados pelo Git.
+
+## Resultado local em 20/10/2026
+
+O disco fornecido foi importado do RAR externo e do RAR interno, a partir da imagem
+CloneCD `YUGIOH.img` (517.872.768 bytes). O executável SLUS_014.11 corresponde ao SHA-256
+configurado. Os conteúdos do disco continuam apenas na máquina do usuário.
+
+Validação executada:
+
+* `python3 install.py --rom <RAR local>`: importação, build nativo Linux e suíte de gameplay concluídos.
+* Primeiro duelo: duas execuções idênticas, LP 8000/8000, mão inicial
+  410/302/107/231/573, primeira carta 410 jogada.
+* Duelo completo contra Simon: resultados, recompensa e retorno ao Free Duel aprovados.
+* Save/load no mapa: 2.000 frames idênticos após retomada em outro processo.
+* Campanha inicial: Jono e três aldeões, avanço por Exit, revanche e flags persistentes aprovados.
+* Quinze casos de screenshots da base: todos corresponderam aos hashes de referência.
+* Janela nativa: inicialização OpenGL 4.6, captura da tela de título e saída normal.
+* Ordenação LIBGS: limites, links e integridade da memória adjacente aprovados com o sysroot do jogo.
+* Importador: cinco testes com dados sintéticos aprovados.
+* Referência web: cinco testes aprovados no GitHub com Emscripten 6.0.0, incluindo WebAssembly real.
+
+A primeira execução remota da suíte web está em
+https://github.com/GenissonEmilio/ForbiddenMemoriesPC/actions/runs/39511904834 .
+O relatório detalhado do instalador permanece local em `tmp/validation/verified-*/report.json`.
+
+A compilação nativa completa, sem disco no runner, e os testes LIBGS/cache de mods/importação
+passaram também em uma máquina limpa do GitHub:
+https://github.com/GenissonEmilio/ForbiddenMemoriesPC/actions/runs/39511917553 .
