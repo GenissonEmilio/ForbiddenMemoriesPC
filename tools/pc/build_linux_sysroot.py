@@ -198,7 +198,14 @@ def build_sdl(sysroot_stamp):
     sdl.c compiles against its headers."""
     fetch_sdl()
     stamp = os.path.join(SDL_BUILD, ".complete")
-    wanted = f"{SDL_ARCHIVE[0]}\n{sysroot_stamp}"
+    # SDL's detected backends depend on the build tools too. In particular,
+    # installing pkg-config must invalidate a build made without PulseAudio;
+    # a cache restored at a different path/compiler must be configured again.
+    compiler = subprocess.check_output(["gcc", "-dumpfullversion"], text=True).strip()
+    pkgconfig_tool = shutil.which("pkg-config")
+    pkgconfig_version = subprocess.check_output([pkgconfig_tool, "--version"], text=True).strip() if pkgconfig_tool else "absent"
+    wanted = (f"{SDL_ARCHIVE[0]}\n{sysroot_stamp}{sha256(__file__)}\n{SYSROOT}\n"
+              f"{shutil.which('gcc')} {compiler}\n{pkgconfig_tool} {pkgconfig_version}\n")
     if os.path.exists(os.path.join(SDL_BUILD, "libSDL3.a")) and os.path.exists(stamp):
         with open(stamp) as handle:
             if handle.read() == wanted:

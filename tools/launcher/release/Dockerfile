@@ -16,4 +16,5 @@ RUN python3 -c 'import tarfile; tarfile.open("/tmp/libarchive.tar.xz").extractal
        --without-xml2 --without-expat --without-libb2 --disable-bsdtar --disable-bsdcpio --disable-bsdcat --disable-bsdunzip \
     && make -j2 && make install \
     && cp COPYING /opt/libarchive/COPYING && rm -rf /tmp/libarchive*
+RUN apt-get update && apt-get install -y --no-install-recommends pkg-config && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
