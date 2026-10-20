@@ -51,6 +51,8 @@ jobs:
         run: |
           docker build -f tools/launcher/release/Test.Dockerfile -t forbidden-memories-clean tools/launcher/release
           mkdir -p tmp/launcher-ci
+          docker run --rm -v "$PWD:/src" forbidden-memories-clean \
+            sh tools/launcher/release/check-runtime.sh
           docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/src" forbidden-memories-clean \
             timeout 45s xvfb-run -a dist/ForbiddenMemoriesPC/ForbiddenMemoriesPC \
               --data-dir /src/tmp/launcher-ci/data --screenshot /src/tmp/launcher-ci/home.png

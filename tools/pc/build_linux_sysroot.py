@@ -34,7 +34,7 @@ SEEDS = ["libc6-dev", "linux-libc-dev", "libfreetype-dev", "libfontconfig-dev", 
          "libgl-dev", "libegl-dev", "libgles-dev", "libx11-dev", "libxext-dev", "libxrandr-dev",
          "libxcursor-dev", "libxi-dev", "libxtst-dev", "libxinerama-dev", "libxfixes-dev", "libxss-dev", "libxkbcommon-dev", "libwayland-dev",
          "libasound2-dev", "libpulse-dev", "libdbus-1-dev", "libudev-dev", "libdrm-dev", "libgbm-dev",
-         "libusb-1.0-0-dev", "libbz2-dev", "uuid-dev", "libgcc-10-dev"]
+         "libusb-1.0-0-dev", "libbz2-dev", "uuid-dev", "libgcc-10-dev", "libasyncns0"]
 # Packages a -dev package names that a build never reads.
 SKIP = re.compile(r"^(perl.*|python.*|dpkg.*|debconf.*|install-info|libc-dev-bin|gcc-(?!10-base).*|gcc|cpp.*|"
                   r"binutils.*|libcrypt-dev|libnsl-dev|rpcsvc-proto|libtirpc-dev|pkg-config|pkgconf.*|"
@@ -42,7 +42,7 @@ SKIP = re.compile(r"^(perl.*|python.*|dpkg.*|debconf.*|install-info|libc-dev-bin
                   r"adduser|passwd|login|systemd.*|udev|dbus|mount|util-linux|coreutils|tar|bash|libpam.*|"
                   r"ucf|libselinux1-dev|libsepol1-dev|libpcre.*-dev|libmount-dev|libblkid-dev|"
                   r"libffi-dev|libsndfile1-dev|libflac-dev|libogg-dev|libvorbis-dev|"
-                  r"libopus-dev|libapparmor-dev|libasyncns.*|libxml2.*)$")
+                  r"libopus-dev|libapparmor-dev|libxml2.*)$")
 
 
 def fetch(url, path):
