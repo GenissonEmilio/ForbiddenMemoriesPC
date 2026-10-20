@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #include <errno.h>
@@ -103,7 +104,28 @@ int Platform_RestartGame(void)
     execv(executable, launch_argv);
     int saved_error = errno; free(executable); errno = saved_error;
  #else
-    execv("/proc/self/exe", launch_argv);
+    /* Portable Linux builds invoke their bundled ELF loader explicitly:
+     * /proc/self/exe is then the loader, which also needs its own arguments
+     * on restart. Keep the game's argv literal and preserve the resource root. */
+    const char *loader = getenv("MEMORIES_LINUX_LOADER");
+    const char *libraries = getenv("MEMORIES_LINUX_LIBRARY_PATH");
+    if (loader && *loader && libraries && *libraries) {
+        size_t count = 0, i;
+        while (launch_argv[count]) count++;
+        char **arguments = calloc(count + 4, sizeof(*arguments));
+        if (arguments) {
+            arguments[0] = (char *)loader;
+            arguments[1] = "--library-path";
+            arguments[2] = (char *)libraries;
+            for (i = 0; i < count; i++) arguments[i + 3] = launch_argv[i];
+            execv(loader, arguments);
+            int saved_error = errno;
+            free(arguments);
+            errno = saved_error;
+        }
+    } else {
+        execv("/proc/self/exe", launch_argv);
+    }
  #endif
     perror("memories-pc: restart");
     sigaction(SIGALRM, &old_action, NULL);

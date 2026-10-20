@@ -6,6 +6,23 @@ baseado no port nativo de [Unchiga e colaboradores](https://github.com/Unchiga/Y
 
 ## Instalar e jogar no Linux
 
+**A forma recomendada é o [release gráfico para Linux](https://github.com/GenissonEmilio/ForbiddenMemoriesPC/releases).**
+
+1. Baixe `ForbiddenMemoriesPC-0.1.0-linux-x86_64.tar.gz` e extraia a pasta inteira.
+2. Abra o executável **ForbiddenMemoriesPC** com dois cliques.
+3. Clique em **Escolher arquivo…**, selecione sua ROM e aguarde a preparação.
+4. Clique em **Iniciar jogo**. Nas próximas sessões, sua ROM já estará lembrada.
+
+Em **Sobre o port → Adicionar ao menu de aplicativos**, crie um atalho no Linux.
+O release inclui a interface, o jogo compilado e as bibliotecas necessárias; não exige
+Python, compilador ou instalação de pacotes de 32 bits. Compatível com Linux x86-64,
+glibc 2.35+ (Ubuntu 22.04+, Debian 12+, Fedora atual), sessão gráfica e OpenGL.
+O pacote não contém ROM. O launcher funciona offline e mantém os saves na pasta do usuário.
+
+![Interface do launcher Linux](docs/launcher-linux.png)
+
+### Compilar a partir do código-fonte
+
 ```sh
 python3 install.py --rom "/caminho/para/seu/Forbidden Memories.rar"
 ./play.sh
@@ -34,6 +51,17 @@ Essa referência é específica de PS2 e continua exigindo o disco do BT3; ela n
 O Forbidden Memories deste repositório é o port nativo para PC. Não há build de navegador do Yu-Gi-Oh! aqui.
 
 Veja [proveniência e validação](notes/fork-validation.md). A documentação original segue abaixo.
+
+O código do launcher está em [`tools/launcher`](tools/launcher), com sua própria licença MIT.
+Para gerar o mesmo pacote Linux com Docker:
+
+```sh
+sh tools/launcher/release/build-linux.sh 0.1.0
+```
+
+O workflow **Linux desktop launcher** compila o pacote sem ROM e testa a interface em
+um Linux limpo sem Python, GTK ou pacotes de 32 bits instalados. Os testes de gameplay
+com a ROM do usuário são executados localmente; o disco não é enviado à CI.
 
 ---
 

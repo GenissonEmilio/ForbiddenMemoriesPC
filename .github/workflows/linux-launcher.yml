@@ -1,0 +1,65 @@
+name: Linux desktop launcher
+
+on:
+  push:
+    branches: [main, web-port]
+    tags: ['linux-launcher-v*']
+    paths:
+      - 'tools/launcher/**'
+      - 'tools/pc/**'
+      - 'src/**'
+      - 'include/**'
+      - 'config/pc/**'
+      - 'tests/pc/test_launcher_model.py'
+      - '.github/workflows/linux-launcher.yml'
+  pull_request:
+    paths: ['tools/launcher/**', 'tools/pc/**', 'src/**', 'include/**', 'config/pc/**', 'tests/pc/test_launcher_model.py', '.github/workflows/linux-launcher.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-launcher-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Launcher model and disc import regressions
+        run: |
+          python -m unittest discover -s tests/pc -p test_launcher_model.py -v
+          python -m unittest discover -s tests/pc -p test_disc_import.py -v
+      - uses: actions/cache@v4
+        with:
+          path: |
+            tmp/pc/linux-sysroot
+            tmp/pc/linux-sysroot-downloads
+            tmp/pc/sdl-m32-portable
+            tmp/pc/sdl-source
+            tmp/pc/tools
+          key: launcher-linux-${{ hashFiles('tools/pc/build_linux_sysroot.py', 'tools/pc/fetch_tools.py') }}
+      - name: Build the complete standalone Linux release without a ROM
+        run: sh tools/launcher/release/build-linux.sh 0.1.0
+      - name: GUI starts on a clean Linux without Python or GTK installed
+        run: |
+          docker build -f tools/launcher/release/Test.Dockerfile -t forbidden-memories-clean tools/launcher/release
+          mkdir -p tmp/launcher-ci
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/src" forbidden-memories-clean \
+            timeout 45s xvfb-run -a dist/ForbiddenMemoriesPC/ForbiddenMemoriesPC \
+              --data-dir /src/tmp/launcher-ci/data --screenshot /src/tmp/launcher-ci/home.png
+          test -s tmp/launcher-ci/home.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ForbiddenMemoriesPC-linux-x86_64
+          path: |
+            dist/ForbiddenMemoriesPC-*.tar.gz
+            dist/ForbiddenMemoriesPC-*.sha256
+            tmp/launcher-ci/home.png
+          if-no-files-found: error

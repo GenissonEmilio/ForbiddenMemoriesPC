@@ -78,3 +78,33 @@ O relatório detalhado do instalador permanece local em `tmp/validation/verified
 A compilação nativa completa, sem disco no runner, e os testes LIBGS/cache de mods/importação
 passaram também em uma máquina limpa do GitHub:
 https://github.com/GenissonEmilio/ForbiddenMemoriesPC/actions/runs/39511917553 .
+
+
+## Launcher Linux 0.1.0
+
+A interface GTK em português permite selecionar ou arrastar a ROM, validar/preparar
+RAR/ZIP, lembrar o disco e abrir o port nativo. Inclui controles, acesso aos saves e
+atalho no menu do Linux. Os arquivos do jogador ficam separados do pacote.
+
+O release é construído em Ubuntu 22.04: interface x86-64 com Python/GTK/Cairo
+incluídos e jogo i386 com loader e bibliotecas próprios. O leitor RAR é libarchive
+3.8.10 verificado por SHA-256; a versão antiga da distribuição falhava no RAR
+CloneCD fornecido. O diretório de recursos e o loader são preservados também quando
+o jogo reinicia, e `buildid` acompanha as tabelas de símbolos para save states.
+
+Verificação local do pacote:
+
+* Janela sem ROM em container Ubuntu 22.04 sem Python, GTK, libarchive ou pacotes i386 instalados.
+* RAR aninhado fornecido pelo usuário importado pelo executável congelado; jogo iniciou,
+  renderizou 1.200 frames e a interface voltou ao estado pronto nesse mesmo container.
+* Executável e runtime do pacote: primeiro duelo determinístico em duas execuções,
+  duelo completo e replay de save/load de 2.000 frames aprovados.
+* Reinício real ao sair dos créditos: o loader incluído reabriu o jogo, carregou seus
+  mods e gerou o frame de título, com saída normal.
+* Seis regressões do launcher e cinco do importador aprovadas; arquivo inválido
+  preserva a seleção anterior e argumentos de arquivos são passados literalmente.
+
+A CI `Linux desktop launcher` compila sem ROM e verifica a abertura da interface
+nesse Linux limpo, em pushes para `main`/`web-port` e pull requests pertinentes.
+O release contém os binários compilados, dependências, avisos e instruções em português;
+a ROM e os relatórios com dados do jogo permanecem locais.

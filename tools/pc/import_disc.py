@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 import shutil
 import stat
 import tempfile
+import sys
 import zipfile
 
 from fm_editor.disc import DiscImage, GameFilesError
@@ -85,7 +86,8 @@ def extract_zip(source, destination, budget):
 
 
 def libarchive():
-    name = ctypes.util.find_library("archive")
+    bundled = Path(getattr(sys, "_MEIPASS", "")) / "libarchive.so.13"
+    name = str(bundled) if getattr(sys, "frozen", False) and bundled.is_file() else ctypes.util.find_library("archive")
     if not name:
         raise ImportError_("RAR import needs libarchive (Linux: libarchive; Ubuntu: libarchive13). "
                            "Alternatively unpack the RAR yourself and import its IMG/BIN file.")
