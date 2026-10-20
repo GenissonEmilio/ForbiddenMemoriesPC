@@ -1,0 +1,16 @@
+/* Online play's screens (net.js): a picture of the game's page (512 x 448), laid over the game's own and scaled up
+   the same way (smoothly), so that they are exactly as soft as the game's menus. The lettering is the game's kind
+   of heavy rounded type. The two typing fields lie over the room code and the name, see-through: a tap on them
+   brings up a phone's keyboard; the letters themselves are drawn in the picture. */
+@import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;900&display=block');
+
+#netcv { position: fixed; z-index: 5; display: none; image-rendering: auto; pointer-events: none;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+#netcv.on { display: block; pointer-events: auto; }
+#netcv.toast { pointer-events: none; }
+.nb-type { position: fixed; z-index: 6; display: none; margin: 0; padding: 0; border: 0; outline: none; background: transparent;
+  color: transparent; caret-color: transparent; font-size: 16px; /* (16px: a phone does not zoom in on it) */
+  -webkit-text-fill-color: transparent; -webkit-tap-highlight-color: transparent; text-transform: uppercase; }
+.nb-type::selection { background: transparent; }
+/* while the screens are open the "touch controls" button steps aside */
+body.netui-on #show { display: none !important; }

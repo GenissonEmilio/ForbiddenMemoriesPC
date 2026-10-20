@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tenkaichi 3">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Tenkaichi 3 Web</title>
+<style>
+  :root { --bg: #0b0c10; --panel: #15171e; --text: #e8e8ea; --muted: #9a9ca6; --accent: #f2a33a; --line: #2a2d38;
+    --st: env(safe-area-inset-top, 0px); --sb: env(safe-area-inset-bottom, 0px);
+    --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px); }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--text); overflow: hidden;
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    -webkit-user-drag: none;
+    -webkit-tap-highlight-color: transparent; }
+  #stage { position: fixed; inset: 0; background: #000; }
+  canvas#canvas { display: block; position: absolute; left: 0; top: 0; width: 100%; height: 100%; outline: none; background: #000; }
+
+  /* the start card */
+  #start { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: calc(16px + var(--st)) calc(16px + var(--sr)) calc(16px + var(--sb)) calc(16px + var(--sl));
+    background: var(--bg); overflow: auto; z-index: 5; }
+  .card { max-width: 460px; width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 24px; box-sizing: border-box; -webkit-user-select: text; user-select: text; }
+  h1 { margin: 0 0 6px; font-size: 20px; }
+  p { margin: 0 0 16px; color: var(--muted); }
+  .pick { display: block; width: 100%; box-sizing: border-box; text-align: center; padding: 13px 16px; border-radius: 8px;
+    background: var(--accent); color: #1a1204; font: 600 16px system-ui, -apple-system, sans-serif; border: 0; cursor: pointer; }
+  .pick + .pick { margin-top: 10px; }
+  .pick.alt { background: #262a35; color: var(--text); }
+  .pick:hover { filter: brightness(1.08); }
+  input[type=file] { display: none; }
+  #status { margin-top: 14px; min-height: 1.5em; font-size: 14px; color: var(--muted); white-space: pre-wrap; }
+  #status.err { color: #ff7b72; }
+  .keys { margin-top: 18px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
+  kbd { font: 12px ui-monospace, monospace; background: #22252f; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  [hidden] { display: none !important; }
+  /* going straight into the game: only a small "Loading…" on black */
+  #start.auto { background: #000; }
+  #start.auto .card { background: none; border: 0; text-align: center; }
+  #start.auto .card > :not(#status) { display: none; }
+  .mobile-only { display: none; }
+  body.coarse .mobile-only { display: block; }
+  body.coarse .desktop-only { display: none; }
+
+  /* the touch controls: drawn over the picture's sides in landscape, under the picture in portrait */
+  /* (--vh, --vw: a hundredth of the size really seen, set by the page: on an iPhone 1vh is a hundredth of the screen
+     WITHOUT Safari's bars, and in landscape the bars take a good part of it) */
+  #pad { position: fixed; inset: 0; display: none; z-index: 3; touch-action: none; --u: var(--vh, 1vh); }
+  body.touch #pad { display: block; }
+  #pad .b, #pad .stick { position: absolute; box-sizing: border-box; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; color: rgba(255,255,255,.85); background: rgba(30,32,40,.42);
+    border: 1.5px solid rgba(255,255,255,.28); font: 700 calc(var(--u) * 4.2) system-ui, -apple-system, sans-serif; }
+  #pad .b.on { background: rgba(242,163,58,.55); border-color: rgba(255,255,255,.7); }
+  #pad .b svg { width: 52%; height: 52%; }
+  #pad .sh { border-radius: calc(var(--u) * 3); width: calc(var(--u) * 17); height: calc(var(--u) * 10); }
+  #pad .sm { border-radius: calc(var(--u) * 3); width: calc(var(--u) * 15); height: calc(var(--u) * 7);
+    font-size: calc(var(--u) * 2.9); letter-spacing: .04em; }
+  #pad .face { width: calc(var(--u) * 14); height: calc(var(--u) * 14); }
+  #pad .stick { width: calc(var(--u) * 36); height: calc(var(--u) * 36); background: rgba(30,32,40,.32); }
+  #pad .knob { position: absolute; left: 50%; top: 50%; width: 44%; height: 44%; margin: -22% 0 0 -22%; border-radius: 50%;
+    background: rgba(255,255,255,.32); border: 1.5px solid rgba(255,255,255,.5); box-sizing: border-box; }
+  #pad .dp { border-radius: calc(var(--u) * 2); width: calc(var(--u) * 10); height: calc(var(--u) * 10); }
+  #pad .hide { width: calc(var(--u) * 8); height: calc(var(--u) * 8); font-size: calc(var(--u) * 3.2); gap: calc(var(--u) * .6); }
+  #pad .hide svg { width: auto; height: 55%; flex: none; }
+
+  /* landscape: sizes from the screen's height. Two columns beside the 4:3 picture (L2 / L1, the D-pad, the stick on the
+     left; R2 / R1 and the face buttons on the right), nothing over another; the small buttons in a row along the bottom
+     middle. The side columns reach a little into the safe area (its middle is clear of the notch). */
+  @media (orientation: landscape) {
+    #pad { --u: var(--vh, 1vh); --el: calc(var(--sl) * .6); --er: calc(var(--sr) * .6); --fl: var(--sl); --fr: var(--sr); }
+    /* (--el/--er: the corners, which reach a little into the safe area; --fl/--fr: the middle of the edge, the whole
+       safe area, where the Dynamic Island is) */
+    #pad .stick { width: calc(var(--u) * 32); height: calc(var(--u) * 32);
+      left: calc(var(--el) + var(--u) * 2); bottom: calc(var(--sb) + var(--u) * 2); }
+    #pad .sh { width: calc(var(--u) * 15); height: calc(var(--u) * 10); }
+    #pad .l2 { left: calc(var(--fl) + var(--u) * 2); top: calc(var(--st) + var(--u) * 3); }
+    #pad .l1 { left: calc(var(--fl) + var(--u) * 2); top: calc(var(--st) + var(--u) * 15); }
+    #pad .r2 { right: calc(var(--fr) + var(--u) * 2); top: calc(var(--st) + var(--u) * 3); }
+    #pad .r1 { right: calc(var(--fr) + var(--u) * 2); top: calc(var(--st) + var(--u) * 15); }
+    /* the D-pad: centred over the stick, under L1 */
+    #pad .dp { width: calc(var(--u) * 9); height: calc(var(--u) * 9); }
+    #pad .dp.up { left: calc(var(--fl) + var(--u) * 13.5); top: calc(var(--st) + var(--u) * 28); }
+    #pad .dp.left { left: calc(var(--fl) + var(--u) * 4.5); top: calc(var(--st) + var(--u) * 37); }
+    #pad .dp.right { left: calc(var(--fl) + var(--u) * 22.5); top: calc(var(--st) + var(--u) * 37); }
+    #pad .dp.down { left: calc(var(--fl) + var(--u) * 13.5); top: calc(var(--st) + var(--u) * 46); }
+    /* the face buttons: a diamond at the right thumb, low as the stick is on the left */
+    #pad .face { width: calc(var(--u) * 11); height: calc(var(--u) * 11); }
+    #pad .face.tri { right: calc(var(--er) + var(--u) * 13.5); bottom: calc(var(--sb) + var(--u) * 25); }
+    #pad .face.squ { right: calc(var(--er) + var(--u) * 24.5); bottom: calc(var(--sb) + var(--u) * 14); }
+    #pad .face.cir { right: calc(var(--er) + var(--u) * 2.5); bottom: calc(var(--sb) + var(--u) * 14); }
+    #pad .face.cro { right: calc(var(--er) + var(--u) * 13.5); bottom: calc(var(--sb) + var(--u) * 3); }
+    /* the small buttons beside the shoulders, in the side columns, off the picture: SELECT and L3 on the left, START
+       and R3 on the right; Hide under them on the right */
+    #pad .sm { width: calc(var(--u) * 11); height: calc(var(--u) * 7); opacity: .85; }
+    #pad .select { left: calc(var(--fl) + var(--u) * 18); top: calc(var(--st) + var(--u) * 4.5); }
+    #pad .l3 { left: calc(var(--fl) + var(--u) * 18); top: calc(var(--st) + var(--u) * 16.5); }
+    #pad .start { right: calc(var(--fr) + var(--u) * 18); top: calc(var(--st) + var(--u) * 4.5); }
+    #pad .r3 { right: calc(var(--fr) + var(--u) * 18); top: calc(var(--st) + var(--u) * 16.5); }
+    #pad .hide { right: calc(var(--fr) + var(--u) * 2); top: calc(var(--st) + var(--u) * 29); width: calc(var(--u) * 17); height: calc(var(--u) * 7);
+      border-radius: calc(var(--u) * 3); opacity: .85; }
+  }
+  /* portrait: the picture on top, the controls under it; sizes from the screen's width */
+  @media (orientation: portrait) {
+    body.touch canvas#canvas { top: var(--st); height: min(var(--vw, 1vw) * 75, var(--vh, 1vh) * 52); }
+    #pad { --u: calc(var(--vw, 1vw) * .62); }
+    #pad .stick { left: calc(var(--u) * 6); bottom: calc(var(--sb) + var(--u) * 22); width: calc(var(--u) * 52); height: calc(var(--u) * 52); }
+    #pad .face { width: calc(var(--u) * 20); height: calc(var(--u) * 20); }
+    #pad .face.tri { right: calc(var(--u) * 26); bottom: calc(var(--sb) + var(--u) * 62); }
+    #pad .face.cir { right: calc(var(--u) * 5); bottom: calc(var(--sb) + var(--u) * 41); }
+    #pad .face.cro { right: calc(var(--u) * 26); bottom: calc(var(--sb) + var(--u) * 20); }
+    #pad .face.squ { right: calc(var(--u) * 47); bottom: calc(var(--sb) + var(--u) * 41); }
+    #pad .sh { width: calc(var(--u) * 24); height: calc(var(--u) * 13); }
+    #pad .dp { width: calc(var(--u) * 15); height: calc(var(--u) * 15); }
+    #pad .dp.up { left: calc(var(--u) * 24.5); bottom: calc(var(--sb) + var(--u) * 112); }
+    #pad .dp.down { left: calc(var(--u) * 24.5); bottom: calc(var(--sb) + var(--u) * 84); }
+    #pad .dp.left { left: calc(var(--u) * 10.5); bottom: calc(var(--sb) + var(--u) * 98); }
+    #pad .dp.right { left: calc(var(--u) * 38.5); bottom: calc(var(--sb) + var(--u) * 98); }
+    #pad .l2, #pad .l1, #pad .r2, #pad .r1 { top: calc(var(--st) + min(var(--vw, 1vw) * 75, var(--vh, 1vh) * 52) + var(--u) * 5); }
+    #pad .l2 { left: calc(var(--u) * 5); }
+    #pad .l1 { left: calc(var(--u) * 32); }
+    #pad .r1 { right: calc(var(--u) * 32); }
+    #pad .r2 { right: calc(var(--u) * 5); }
+    #pad .sm { width: calc(var(--u) * 21); height: calc(var(--u) * 10); font-size: calc(var(--u) * 4); }
+    #pad .select { left: calc(50% - var(--u) * 23); bottom: calc(var(--sb) + var(--u) * 4); }
+    #pad .start { left: calc(50% + var(--u) * 2); bottom: calc(var(--sb) + var(--u) * 4); }
+    #pad .l3 { left: calc(50% - var(--u) * 23); top: calc(var(--st) + min(var(--vw, 1vw) * 75, var(--vh, 1vh) * 52) + var(--u) * 22); }
+    #pad .r3 { left: calc(50% + var(--u) * 2); top: calc(var(--st) + min(var(--vw, 1vw) * 75, var(--vh, 1vh) * 52) + var(--u) * 22); }
+    #pad .hide { left: calc(50% - var(--u) * 10); top: calc(var(--st) + min(var(--vw, 1vw) * 75, var(--vh, 1vh) * 52) + var(--u) * 36);
+      width: calc(var(--u) * 20); height: calc(var(--u) * 10); border-radius: calc(var(--u) * 3); font-size: calc(var(--u) * 4.5); opacity: .6; }
+  }
+  #show { position: fixed; z-index: 3; right: calc(var(--sr) + 10px); bottom: calc(var(--sb) + 10px); display: none;
+    padding: 8px 12px; border-radius: 8px; background: rgba(30,32,40,.6); color: #fff; border: 1px solid rgba(255,255,255,.3);
+    font: 600 13px system-ui, -apple-system, sans-serif; }
+  body.coarse.started:not(.touch) #show { display: block; transition: opacity .5s; }
+  body.coarse.started:not(.touch) #show.away { opacity: 0; pointer-events: none; }
+  #hud { position: fixed; z-index: 4; left: calc(var(--sl) + 6px); top: calc(var(--st) + 4px); display: none;
+    font: 12px ui-monospace, monospace; color: #9f9; text-shadow: 0 0 3px #000; pointer-events: none; }
+  /* disc reads that take a while (a download on the hosted build): a small badge, so a loading screen is not mistaken
+     for a hang */
+  #net { position: fixed; z-index: 4; right: calc(var(--sr) + 8px); top: calc(var(--st) + 6px); display: none;
+    padding: 4px 9px; border-radius: 10px; background: rgba(0,0,0,.55); color: #fff; pointer-events: none;
+    font: 600 11px system-ui, -apple-system, sans-serif; }
+  #net.on { display: block; }
+  #err { position: fixed; z-index: 6; left: 16px; right: 16px; bottom: calc(var(--sb) + 16px); margin: 0; padding: 12px;
+    background: #2a1416; color: #ff7b72; border-radius: 8px; white-space: pre-wrap; display: none; font: 13px ui-monospace, monospace; }
+</style>
+<link rel="stylesheet" href="net.css">
+<script src="net.js"></script>
+</head>
+<body>
+<div id="stage"><canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas></div>
+<div id="pad" aria-hidden="true">
+  <div class="stick" data-stick><div class="knob"></div></div>
+  <div class="b dp up" data-btn="up"><svg viewBox="0 0 20 20"><path d="M10 5 15 13H5Z" fill="#fff" opacity=".8"/></svg></div>
+  <div class="b dp down" data-btn="down"><svg viewBox="0 0 20 20"><path d="M10 15 15 7H5Z" fill="#fff" opacity=".8"/></svg></div>
+  <div class="b dp left" data-btn="left"><svg viewBox="0 0 20 20"><path d="M5 10 13 5V15Z" fill="#fff" opacity=".8"/></svg></div>
+  <div class="b dp right" data-btn="right"><svg viewBox="0 0 20 20"><path d="M15 10 7 5V15Z" fill="#fff" opacity=".8"/></svg></div>
+  <div class="b face tri" data-btn="tri"><svg viewBox="0 0 20 20"><path d="M10 3 18 17H2Z" fill="none" stroke="#4fd1a5" stroke-width="2.2" stroke-linejoin="round"/></svg></div>
+  <div class="b face cir" data-btn="cir"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" fill="none" stroke="#ff6b7a" stroke-width="2.2"/></svg></div>
+  <div class="b face cro" data-btn="cro"><svg viewBox="0 0 20 20"><path d="M4 4 16 16M16 4 4 16" stroke="#7fb2ff" stroke-width="2.4" stroke-linecap="round"/></svg></div>
+  <div class="b face squ" data-btn="squ"><svg viewBox="0 0 20 20"><rect x="3.5" y="3.5" width="13" height="13" fill="none" stroke="#f59bd6" stroke-width="2.2"/></svg></div>
+  <div class="b sh l2" data-btn="l2">L2</div><div class="b sh l1" data-btn="l1">L1</div>
+  <div class="b sh r2" data-btn="r2">R2</div><div class="b sh r1" data-btn="r1">R1</div>
+  <div class="b sm select" data-btn="select">SELECT</div><div class="b sm start" data-btn="start">START</div>
+  <div class="b sm l3" data-btn="l3">L3</div><div class="b sm r3" data-btn="r3">R3</div>
+  <div class="b hide" data-hide title="Hide the touch controls"><svg viewBox="0 0 20 20"><path d="M5 8l5 5 5-5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Hide</span></div>
+</div>
+<button id="show">Touch controls</button>
+<div id="hud"></div>
+<div id="net"></div>
+<pre id="err"></pre>
+<div id="start">
+  <div class="card">
+    <h1>Budokai Tenkaichi 3, in the browser</h1>
+    <p>Choose your own disc image of the USA release (SLUS-21678). It is read in place on this device and never uploaded.</p>
+    <button class="pick" id="serverDisc" hidden>Play</button>
+    <label class="pick" id="pickLabel">Choose disc image (.iso)<input id="iso" type="file" accept=".iso,application/x-iso9660-image,application/octet-stream"></label>
+    <div id="status"></div>
+    <div class="keys desktop-only"><kbd>F1</kbd> settings and controls &nbsp; <kbd>F11</kbd> full screen &nbsp; Saves stay in this browser.</div>
+    <div class="keys mobile-only">Plays in landscape or portrait, with touch controls (a controller works too).
+      For full screen on iPhone: Share &rarr; Add to Home Screen. Saves stay on this device.</div>
+  </div>
+</div>
+<script>
+  const Q = new URLSearchParams(location.search);
+  const $ = (id) => document.getElementById(id);
+  const status = $('status');
+  const say = (t, err) => { status.textContent = t; status.className = err ? 'err' : ''; };
+  const showError = (t) => { const e = $('err'); e.textContent = t; e.style.display = 'block'; };
+  const coarse = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1;
+  const phone = coarse && Math.min(screen.width, screen.height) < 600;
+  if (coarse) document.body.classList.add('coarse');
+  // iPhone: a type filter can grey out a disc image in Files (iOS does not always know .iso); allow any file there
+  if (coarse) $('iso').removeAttribute('accept');
+  // JSPI where the browser has it (Chrome, Edge); else the Asyncify build (Safari). ?build=bt3-async forces one.
+  const BUILD = Q.get('build') || ('Suspending' in WebAssembly ? 'bt3-jspi' : 'bt3-async');
+
+  var Module = {
+    canvas: $('canvas'),
+    // everything the program prints, also kept for reading back (the console keeps only the last messages)
+    log: [], logBase: 0,
+    print: (t) => { Module.keep(t); console.log(t); },
+    printErr: (t) => { Module.keep(t); console.warn(t); },
+    keep: (t) => { Module.log.push(t); if (Module.log.length > 4000) { Module.log.splice(0, 1000); Module.logBase += 1000; } },
+    noInitialRun: true,
+    // phones: a smaller cache of the disc's files (they are kept in memory)
+    webCacheBudget: (phone ? 256 : 768) * 1024 * 1024,
+    // the port's switches; set before the program starts up (its start-up code reads the environment, which is
+    // fixed at the first read)
+    preRun: [() => Object.assign(ENV, { BT3_GS: 'gpu', BT3_GPU_API: 'gl', BT3_UNLOCK_ALL: '1', BT3_SAVES: '/persist/saves',
+                                        BT3_SETTINGS: '/persist/settings.ini' },
+                                      // online play: a page loaded into a match (net.js)
+                                      window.BT3Net ? BT3Net.sessionEnv() : {},
+                                      // testing: ?env=NAME=value,NAME=value (the port's diagnostic switches)
+                                      Object.fromEntries((Q.get('env') || '').split(',').filter(Boolean).map((kv) => kv.split('='))))],
+    onRuntimeInitialized: () => { Module.ready = true; if (Module.pendingStart) Module.pendingStart(); },
+    onAbort: (what) => showError('The game stopped: ' + what),
+  };
+  addEventListener('error', (e) => Module.keep('page error: ' + (e.message || e)));
+  addEventListener('unhandledrejection', (e) => Module.keep('page error: ' + (e.reason && (e.reason.stack || e.reason.message) || e.reason)));
+
+  // Sound: browsers (iPhone above all) only start sound from a tap. The page makes the context SDL then uses
+  // (Module.SDL3.audioContext) and resumes it at every tap until it plays; on iPhone it plays with the silent
+  // switch on too, as a video would.
+  // (the silent switch: set at once, before anything plays; setting it later does not reach a running context)
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  function audioUnlock() {
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = 'playback';
+      Module.SDL3 = Module.SDL3 || {};
+      if (!Module.SDL3.audioContext) Module.SDL3.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = Module.SDL3.audioContext;
+      if (ctx.state !== 'running') {
+        ctx.resume().catch(() => {});
+        // iPhone: a sound started inside the tap is what really lets the context play (resume alone may not)
+        const src = ctx.createBufferSource();
+        src.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+        src.connect(ctx.destination);
+        src.start(0);
+      }
+    } catch (e) { Module.keep('audio: ' + e); }
+  }
+  // every tap or key until the sound runs (the game starts without one, and iPhone also stops sound on calls and
+  // when the page is in the background)
+  for (const ev of ['touchend', 'pointerup', 'keydown', 'click']) addEventListener(ev, () => {
+    const ctx = Module.SDL3 && Module.SDL3.audioContext;
+    if (!ctx || ctx.state !== 'running') audioUnlock();
+  }, { capture: true, passive: true });
+
+  // No page scrolling, zooming or text selection while playing.
+  for (const ev of ['touchmove', 'gesturestart', 'gesturechange', 'dblclick']) {
+    document.addEventListener(ev, (e) => { if (!e.target.closest || !e.target.closest('.card')) e.preventDefault(); }, { passive: false });
+  }
+
+  // ---- touch controls: the PS2 pad's buttons (include/sys/pad.h bits, port/web/src/web_touch.c) ----
+  const BITS = { select: 0x1, l3: 0x2, r3: 0x4, start: 0x8, up: 0x10, right: 0x20, down: 0x40, left: 0x80, l2: 0x100,
+                 r2: 0x200, l1: 0x400, r1: 0x800, tri: 0x1000, cir: 0x2000, cro: 0x4000, squ: 0x8000 };
+  const Touch = window.BT3Touch = {
+    ptrs: new Map(), // pointer id -> {stick: true} or {btn: element}
+    lx: 128, ly: 128, bits: 0, sent: '',
+    els: [...document.querySelectorAll('#pad [data-btn]')], stick: document.querySelector('#pad [data-stick]'),
+    rects: null,
+    layout() { this.rects = this.els.map((el) => ({ el, r: el.getBoundingClientRect() })); this.sr = this.stick.getBoundingClientRect(); },
+    btnAt(x, y) { // the nearest button whose circle (a little larger than drawn) holds the point
+      let best = null, bd = 1;
+      for (const { el, r } of this.rects) {
+        const d = Math.hypot((x - (r.left + r.width / 2)) / (r.width / 2 * 1.3), (y - (r.top + r.height / 2)) / (r.height / 2 * 1.3));
+        if (d < bd) { bd = d; best = el; }
+      }
+      return best;
+    },
+    stickTo(x, y) {
+      const r = this.sr, rad = r.width / 2, cx = r.left + rad, cy = r.top + rad;
+      let dx = (x - cx) / rad, dy = (y - cy) / rad;
+      const m = Math.hypot(dx, dy);
+      if (m > 1) { dx /= m; dy /= m; }
+      this.stick.firstChild.style.transform = `translate(${dx * rad * 0.62}px, ${dy * rad * 0.62}px)`;
+      // a dead zone in the middle, then the full range: the direction, scaled by how far past the dead zone
+      const dead = 0.16, len = Math.min(m, 1), amount = len < dead ? 0 : (len - dead) / (1 - dead);
+      const ux = len > 0 ? dx / len : 0, uy = len > 0 ? dy / len : 0;
+      this.lx = Math.max(0, Math.min(255, Math.round(128 + ux * amount * 127.5)));
+      this.ly = Math.max(0, Math.min(255, Math.round(128 + uy * amount * 127.5)));
+    },
+    onButton(x, y) { // the button drawn under the point (its box and a few pixels around it)
+      for (const { el, r } of this.rects) {
+        if (x >= r.left - 4 && x <= r.right + 4 && y >= r.top - 4 && y <= r.bottom + 4) return el;
+      }
+      return null;
+    },
+    inStick(x, y) { const r = this.sr; return Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2)) < r.width / 2 * 1.5; },
+    update() {
+      let bits = 0, stick = false;
+      for (const p of this.ptrs.values()) { if (p.btn) bits |= BITS[p.btn.dataset.btn] || 0; if (p.stick) stick = true; }
+      if (!stick) { this.lx = this.ly = 128; this.stick.firstChild.style.transform = ''; }
+      for (const el of this.els) el.classList.toggle('on', !!(bits & BITS[el.dataset.btn]));
+      this.bits = bits;
+      this.latch = (this.latch || 0) | bits; // (a tap shorter than a frame, for the page's own screens: net.js)
+      const key = bits + ',' + this.lx + ',' + this.ly;
+      if (key !== this.sent && Module._Web_TouchSet) { Module._Web_TouchSet(bits, this.lx, this.ly); this.sent = key; }
+    },
+    down(e) {
+      if (!this.rects) this.layout();
+      if (e.target.closest('[data-hide]')) { setTouch(false); return; }
+      // a finger on a drawn button is that button (the D-pad sits right above the stick); the stick takes what is
+      // left of its wider touch area
+      const onBtn = this.onButton(e.clientX, e.clientY);
+      if (onBtn) {
+        this.ptrs.set(e.pointerId, { btn: onBtn });
+      } else if (this.inStick(e.clientX, e.clientY) && ![...this.ptrs.values()].some((p) => p.stick)) {
+        this.ptrs.set(e.pointerId, { stick: true }); this.stickTo(e.clientX, e.clientY);
+      } else {
+        this.ptrs.set(e.pointerId, { btn: this.btnAt(e.clientX, e.clientY) });
+      }
+      this.update();
+    },
+    move(e) {
+      const p = this.ptrs.get(e.pointerId);
+      if (!p) return;
+      if (p.stick) this.stickTo(e.clientX, e.clientY); else p.btn = this.btnAt(e.clientX, e.clientY); // slide between buttons
+      this.update();
+    },
+    up(e) { if (this.ptrs.delete(e.pointerId)) this.update(); },
+  };
+  const pad = $('pad');
+  pad.addEventListener('pointerdown', (e) => { e.preventDefault(); try { pad.setPointerCapture(e.pointerId); } catch (_) {} Touch.down(e); });
+  pad.addEventListener('pointermove', (e) => { e.preventDefault(); Touch.move(e); });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) pad.addEventListener(ev, (e) => Touch.up(e));
+  pad.addEventListener('contextmenu', (e) => e.preventDefault());
+  // iPhone: a held finger would start the system's long-press gestures (drag preview, magnifier, callout); the
+  // pointer events above still arrive
+  for (const el of [pad, $('stage')]) el.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+  // the boot pictures (the company logos): a tap or click on the game skips them all (src/menu/menu_i_c.c)
+  addEventListener('pointerdown', () => { // (anywhere: the touch controls lie over the picture)
+    try {
+      if (Module._Web_InLogos && Module._Web_InLogos()) {
+        Module._Web_TouchSet(0x8, 128, 128); // START (the latch keeps it for the game's next read)
+        setTimeout(() => Module._Web_TouchSet(Touch.bits, Touch.lx, Touch.ly), 120);
+      }
+    } catch (e) {}
+  }, true);
+  // the size really seen (Safari's bars come and go): the touch controls are laid out in hundredths of it
+  const units = () => {
+    const vv = window.visualViewport, h = vv ? vv.height : innerHeight, w = vv ? vv.width : innerWidth;
+    document.documentElement.style.setProperty('--vh', (h / 100) + 'px');
+    document.documentElement.style.setProperty('--vw', (w / 100) + 'px');
+  };
+  units();
+  addEventListener('resize', units);
+  if (window.visualViewport) visualViewport.addEventListener('resize', units);
+  const relayout = () => { units(); Touch.rects = null; requestAnimationFrame(() => { Touch.layout(); dispatchEvent(new Event('resize')); }); };
+  addEventListener('orientationchange', relayout);
+  matchMedia('(orientation: portrait)').addEventListener('change', relayout);
+  function setTouch(on) {
+    document.body.classList.toggle('touch', on);
+    if (!on && typeof showAgain === 'function') setTimeout(showAgain, 0);
+    Touch.ptrs.clear(); Touch.update(); relayout();
+    try { localStorage.setItem('bt3.touch', on ? '1' : '0'); } catch (e) {}
+  }
+  $('show').addEventListener('click', () => setTouch(true));
+  // controls hidden: the button that brings them back steps out of the picture after a few seconds; a tap shows it
+  let showTimer = 0;
+  const showAgain = () => { $('show').classList.remove('away'); clearTimeout(showTimer); showTimer = setTimeout(() => $('show').classList.add('away'), 3500); };
+  addEventListener('pointerdown', () => { if (!document.body.classList.contains('touch')) showAgain(); }, true);
+  // a controller connected: the touch controls step aside (the button brings them back)
+  addEventListener('gamepadconnected', () => { if (document.body.classList.contains('touch')) setTouch(false); });
+
+  // ---- statistics: ?hud=1 shows them, ?telemetry=1 sends them to the test server (port/web/serve.mjs) ----
+  const SID = Math.random().toString(36).slice(2, 8); // this page load (several pages may report at once)
+  const memMB = () => (typeof HEAP8 !== 'undefined' && HEAP8 ? HEAP8.length / 1048576 : 0);
+  function snapshot() {
+    const s = Module.webStats || {};
+    return { sid: SID, t: Math.round(performance.now()), build: BUILD, fps: s.fps && +s.fps.toFixed(1), busy: s.busy && +s.busy.toFixed(3),
+             memMB: Math.round(memMB()), heapMB: Module._Web_HeapTop ? Math.round(Module._Web_HeapTop() / 1048576) : 0,
+             cacheMB: Math.round((Module.webCacheBytes || 0) / 1048576),
+             audio: Module.SDL3 && Module.SDL3.audioContext ? Module.SDL3.audioContext.state : 'none',
+             canvas: [Module.canvas.width, Module.canvas.height], view: [innerWidth, innerHeight, devicePixelRatio],
+             touch: [Touch.bits, Touch.lx, Touch.ly],
+             waits: s.waits, askedMs: s.askedMs && Math.round(s.askedMs), waitedMs: s.waitedMs && Math.round(s.waitedMs),
+             longestMs: s.longestMs && Math.round(s.longestMs), prof: s.prof && s.prof.map((x) => +x.toFixed(3)) };
+  }
+  if (Q.get('hud')) $('hud').style.display = 'block';
+  Module.onWebStats = (s) => { if (Q.get('hud')) $('hud').textContent = `${s.fps.toFixed(0)} fps  ${(s.busy * 100).toFixed(0)}% busy  ${BUILD}`; };
+  if (Q.get('telemetry')) {
+    let sentLog = 0;
+    const send = () => {
+      const from = Math.max(sentLog, Module.logBase), lines = Module.log.slice(from - Module.logBase);
+      sentLog = Module.logBase + Module.log.length;
+      fetch('/telemetry', { method: 'POST', body: JSON.stringify({ ...snapshot(), log: lines }), keepalive: true }).catch(() => {});
+    };
+    setInterval(send, 2000);
+    Module.telemetryNow = send;
+  }
+
+  // ---- the disc ----
+  // A disc image as {size, readAt}: a File the user chose (read in place), or an address that answers HTTP range
+  // requests (the test server's /disc.iso, port/web/serve.mjs).
+  const fileDisc = (f) => ({ size: f.size, readAt: async (o, n) => new Uint8Array(await f.slice(o, o + n).arrayBuffer()) });
+  // Reads of the network kinds: answers checked (status, length), a failed one tried again (a phone on mobile data
+  // drops requests now and then), and while any read takes longer than a moment, the badge in the corner.
+  let netBusy = 0, netTimer = 0, netBytes = 0;
+  const netShow = () => { $('net').textContent = `Loading ${(netBytes / 1048576).toFixed(1)} MB`; $('net').classList.add('on'); };
+  const netRead = async (what, quiet) => {
+    if (quiet) { // (a read ahead of the game: retried the same, but not shown)
+      for (let i = 0; ; i++) { try { return await what(); } catch (e) { if (i >= 3) throw e; await new Promise((ok) => setTimeout(ok, 500 * 2 ** i)); } }
+    }
+    if (netBusy++ === 0) netTimer = setTimeout(netShow, 700);
+    try {
+      for (let i = 0; ; i++) {
+        try { return await what(); } catch (e) {
+          if (i >= 6) throw e;
+          Module.keep && Module.keep(`web: disc read failed (${e.message || e}), trying again`);
+          await new Promise((ok) => setTimeout(ok, 300 * 2 ** i));
+        }
+      }
+    } finally { if (--netBusy === 0) { clearTimeout(netTimer); $('net').classList.remove('on'); } }
+  };
+  const getBytes = async (url, range, want) => {
+    const r = await fetch(url, range ? { headers: { Range: range } } : {});
+    if (r.status !== (range ? 206 : 200)) throw new Error(`${url}: HTTP ${r.status}`);
+    const b = new Uint8Array(await r.arrayBuffer());
+    if (b.length !== want) throw new Error(`${url}: ${b.length} bytes, expected ${want}`);
+    netBytes += b.length;
+    if ($('net').classList.contains('on')) netShow();
+    return b;
+  };
+  // a server with range requests (the test server's /disc.iso, port/web/serve.mjs)
+  const httpDisc = async (url) => {
+    const head = await fetch(url, { headers: { Range: 'bytes=0-0' } });
+    const size = +(head.headers.get('Content-Range') || '').split('/')[1];
+    if (!size) throw new Error('the server did not answer a range request for ' + url);
+    return { size, readAt: async (o, n) => n === 0 ? new Uint8Array(0)
+      : netRead(() => getBytes(url, `bytes=${o}-${o + n - 1}`, n)) };
+  };
+  // the hosted build (cloudflare/): the image in pieces of equal size (<base>/00000.bin, ...; <base>/index.json gives
+  // {size, piece}), fetched whole, several at a time, kept by the browser's own cache (the answers say immutable) and
+  // the last few here, so the many small files that share a piece cost one download
+  const pieceDisc = async (base) => {
+    const r = await fetch(base + '/index.json');
+    if (!r.ok) throw new Error('no ' + base + '/index.json');
+    const { size, piece } = await r.json();
+    const kept = new Map(), keep = 40; // piece number -> Promise<Uint8Array> (oldest first)
+    // Reading ahead: while the game reads the disc in order (a stage, a fighter: file after file, next to each other
+    // on the disc), the next pieces are fetched before it asks for them, so it no longer waits a round trip to the
+    // server per piece (the phone's long loading screens). Scattered reads (voices, sounds) read nothing ahead.
+    const AHEAD = 4;
+    let lastPiece = -10, run = 0;
+    // the pieces the start-up reads (the USA disc: system files, the boot logos, the title), asked for all at once
+    // while the program is still loading, instead of one after another as the game gets to them
+    const BOOT = [0, 3, 1398, 5, 4, 8, 473, 480];
+    const count = Math.ceil(size / piece);
+    const get = (i, quiet) => {
+      let p = kept.get(i);
+      if (p) { kept.delete(i); kept.set(i, p); return p; }
+      const want = Math.min(piece, size - i * piece);
+      p = netRead(() => getBytes(`${base}/${String(i).padStart(5, '0')}.bin`, null, want), quiet);
+      p.catch(() => kept.delete(i));
+      kept.set(i, p);
+      while (kept.size > keep) kept.delete(kept.keys().next().value);
+      return p;
+    };
+    if (size === 3020816384) setTimeout(() => BOOT.forEach((i) => get(i).catch(() => {})), 0);
+    return { size, readAt: async (o, n) => {
+      const out = new Uint8Array(n);
+      if (n === 0) return out;
+      const first = Math.floor(o / piece), last = Math.floor((o + n - 1) / piece);
+      run = first >= lastPiece && first <= lastPiece + 2 ? run + 1 : 0;
+      lastPiece = last;
+      if (run >= 2) for (let i = last + 1; i <= Math.min(count - 1, last + AHEAD); i++) if (!kept.has(i)) get(i, true).catch(() => {});
+      // in order, at most 6 at a time (one large file, the movies above all, is a hundred pieces)
+      for (let a = first; a <= last; a += 6) {
+        const ids = [];
+        for (let i = a; i <= Math.min(last, a + 5); i++) ids.push(i);
+        const parts = await Promise.all(ids.map(get));
+        ids.forEach((i, k) => {
+          const from = Math.max(o, i * piece), to = Math.min(o + n, (i + 1) * piece);
+          out.set(parts[k].subarray(from - i * piece, to - i * piece), from - o);
+        });
+      }
+      return out;
+    } };
+  };
+
+  async function start(disc) {
+    try {
+      say('Reading the disc image…');
+      Module.webDisc = disc;
+      const n = await Module.webDiscIndex();
+      say(`Disc recognised (${n.toLocaleString()} archive entries). Starting…`);
+      // saves and settings: kept in this browser (IndexedDB), written back every few seconds and when the page is left
+      // ask the browser to keep this site's storage (Safari otherwise may clear it after a week without a visit;
+      // a Home Screen app keeps it)
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+      FS.mkdir('/persist');
+      FS.mount(IDBFS, {}, '/persist');
+      await new Promise((ok) => FS.syncfs(true, () => ok()));
+      try { FS.mkdir('/persist/saves'); } catch (e) {}
+      const save = () => FS.syncfs(false, () => {});
+      setInterval(save, 5000);
+      addEventListener('pagehide', save);
+      document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+      $('start').remove();
+      document.body.classList.add('started');
+      let touch = coarse;
+      try { const t = localStorage.getItem('bt3.touch'); if (t !== null) touch = t === '1'; } catch (e) {}
+      if (Q.get('touch')) touch = Q.get('touch') === '1';
+      setTouch(touch);
+      if (navigator.wakeLock) {
+        const lock = () => navigator.wakeLock.request('screen').catch(() => {});
+        lock();
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) lock(); });
+      }
+      Module.canvas.focus();
+      if (window.BT3Net) { await BT3Net.beforeStart(); BT3Net.afterStart(); } // (a match: the other player first)
+      await Module.callMain([]);
+    } catch (e) {
+      console.error(e);
+      if ($('start')) say(String(e.message || e), true); else showError(String(e.stack || e.message || e));
+    }
+  }
+  const go = (disc) => Module.ready ? start(disc) : (Module.pendingStart = () => start(disc), say('Loading the program…'));
+  $('iso').addEventListener('change', (e) => { audioUnlock(); if (e.target.files[0]) go(fileDisc(e.target.files[0])); });
+  $('pickLabel').addEventListener('click', audioUnlock);
+  // the server's own disc image (port/web/serve.mjs /disc.iso): straight into the game, no start screen. Sound
+  // starts at the first tap in the game (the resume listeners above). ?pick=1 shows the start screen anyway.
+  // Without a disc on the server (or with ?pick=1) the start screen asks for the player's own disc image.
+  const served = Q.get('disc') || '/disc.iso';
+  $('pickLabel').hidden = true;
+  $('start').classList.add('auto');
+  say('Loading…');
+  (Q.get('disc') ? httpDisc(served) : pieceDisc('/disc').catch(() => httpDisc(served))).then((disc) => {
+    if (!Q.get('pick')) { go(disc); return; }
+    $('start').classList.remove('auto');
+    const b = $('serverDisc');
+    $('pickLabel').hidden = false;
+    b.hidden = false;
+    $('pickLabel').classList.add('alt');
+    say('');
+    b.textContent = `Play (disc image on ${location.hostname === '127.0.0.1' || location.hostname === 'localhost' ? 'this computer' : location.hostname})`;
+    b.addEventListener('click', () => { audioUnlock(); go(disc); }, { once: true });
+  }, (e) => {
+    $('start').classList.remove('auto');
+    $('pickLabel').hidden = false;
+    say(Q.get('disc') ? String(e.message || e) : '', !!Q.get('disc'));
+  });
+
+  // the program itself
+  if (typeof WebAssembly !== 'object') say('This browser cannot run WebAssembly.', true);
+  else {
+    const s = document.createElement('script');
+    s.src = BUILD + '.js';
+    s.onerror = () => say('Could not load ' + BUILD + '.js', true);
+    document.body.appendChild(s);
+  }
+</script>
+</body>
+</html>

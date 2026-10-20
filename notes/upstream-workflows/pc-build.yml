@@ -1,0 +1,137 @@
+name: Native PC foundation
+on:
+  push:
+  pull_request:
+jobs:
+  core-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      # The controls window test draws the pad picture through libpng; the
+      # object loader test builds 32-bit (gcc -m32) and its mods with clang
+      # and lld, as a player's build_mod.py does. The editor's GUI tests run
+      # in Xvfb at 96 dpi with DejaVu Sans as Tk's sans-serif, so the widths
+      # they hold the tabs to do not move with the runner image's fonts.
+      - run: >-
+          sudo apt-get update && sudo apt-get install --yes --no-install-recommends
+          libpng-dev gcc-multilib lld xvfb xauth python3-tk fonts-dejavu-core fontconfig
+      - name: LIBGS packet priority regression
+        run: python tools/pc/test_libgs_priority.py
+      - run: cmake -S . -B tmp/pc -DBUILD_TESTING=ON
+      - run: cmake --build tmp/pc --config Release
+      - name: Tests including the editor GUI
+        run: |
+          xvfb-run -a -s '-screen 0 1600x1000x24 -dpi 96' sh -ec '
+            fc-match sans-serif
+            python -c "import tkinter; root = tkinter.Tk(); root.destroy()"
+            python tools/pc/test_path_layout.py --build tmp/pc'
+      - run: cmake --build tmp/pc --target pc_audit
+      - run: python tools/pc/test_vt_check.py
+  # The Windows game is built with llvm-mingw for i686 (play.bat,
+  # tools/pc/fetch_tools.py), so the tests are too: the same pinned release,
+  # with zlib and libpng from tools/pc/build_win32_deps.py. The runner's cmake
+  # and ctest are native Windows programs, as the tests need
+  # (notes/pc-build.md, "Tests"); MSVC is not a supported compiler.
+  core-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      LLVM_MINGW: llvm-mingw-20260922-ucrt-x86_64
+      LLVM_MINGW_SHA256: e3ad77d117a4bea19a7a3b333341824d79a5a371004a10e25b8504e7b3047666
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            tmp/pc/llvm-mingw
+            tmp/pc/win32-deps
+          key: win32-${{ env.LLVM_MINGW }}-${{ hashFiles('tools/pc/build_win32_deps.py') }}
+      - name: llvm-mingw, Ninja and the libraries
+        run: |
+          if [ ! -d tmp/pc/llvm-mingw ]; then
+            curl --fail --location --retry 3 --silent --show-error --output llvm-mingw.zip \
+              "https://github.com/mstorsjo/llvm-mingw/releases/download/20260922/$LLVM_MINGW.zip"
+            echo "$LLVM_MINGW_SHA256  llvm-mingw.zip" | sha256sum --check --strict
+            mkdir -p tmp/pc && unzip -q llvm-mingw.zip -d tmp/pc && mv "tmp/pc/$LLVM_MINGW" tmp/pc/llvm-mingw
+          fi
+          cygpath -w "$PWD/tmp/pc/llvm-mingw/bin" >> "$GITHUB_PATH"
+          python -m pip install --quiet ninja
+      - run: '[ -f tmp/pc/win32-deps/lib/libpng16.a ] || python tools/pc/build_win32_deps.py'
+      - run: >-
+          cmake -S . -B tmp/pc/tests -G Ninja -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=i686-w64-mingw32-clang
+          -DPNG_LIBRARY=$PWD/tmp/pc/win32-deps/lib/libpng16.a -DPNG_PNG_INCLUDE_DIR=$PWD/tmp/pc/win32-deps/include
+          -DZLIB_LIBRARY=$PWD/tmp/pc/win32-deps/lib/libzs.a -DZLIB_INCLUDE_DIR=$PWD/tmp/pc/win32-deps/include
+      - run: cmake --build tmp/pc/tests
+      - run: python tools/pc/test_controls_backend.py --target windows --software
+      - run: python tools/pc/test_path_layout.py --build tmp/pc/tests
+      - run: cmake --build tmp/pc/tests --target pc_audit
+  core-macos:
+    # The standard macos-15 image is ARM64; the Intel image has a distinct
+    # macos-15-intel label (actions/runner-images).
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            tmp/pc/llvm-macos
+            tmp/pc/tools/macos
+            tmp/pc/macos-deps
+          key: macos-arm64-llvm21.1.8-${{ hashFiles('tools/pc/macos_toolchain.json', 'tools/pc/macos_deps.py', 'tools/pc/dependency_archives.py', 'tools/pc/fetch_tools.py') }}
+      - name: Build the complete macOS ARM64 game without a disc
+        run: python tools/pc/build.py --target macos
+      - name: Verify LLVM transformations and native linkage
+        run: |
+          python tools/pc/test_guest_store_canary.py
+          python tools/pc/test_llvm_guest.py
+          python tools/pc/test_translated_ir.py --case ir
+          python tools/pc/test_translated_ir.py --case ir --optimize
+          python tools/pc/test_native_call_marshalling.py
+          python tools/pc/test_direct_overlay_bridge.py
+          python tools/pc/test_ps1_layouts.py
+          python tools/pc/test_guest_storage_layout.py
+          python tools/pc/test_libgs_sprite_guest.py
+          python tools/pc/test_macos_linkage.py --binary tmp/pc/macos/memories-arm64
+      - name: Native components and sanitizers with Apple Clang
+        run: |
+          # LLVM 21 remains the pinned guest-IR frontend and game toolchain.
+          # Use Apple's runtime for host sanitizer harnesses: LLVM 21's
+          # macOS ASan runtime deadlocks during shadow-memory initialization.
+          # Guest fixtures become native objects with pinned LLVM before
+          # Apple Clang compiles/instruments host units and links its runtime.
+          # Guest objects are unsanitized (ASan runtime ABIs differ); guest
+          # accesses remain covered by the dedicated IR/layout canaries.
+          export CC=/usr/bin/clang
+          export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          python tools/pc/test_native.py
+          python tools/pc/test_native.py --sanitize
+          python tools/pc/test_guest_contracts.py --sanitize
+          python tools/pc/test_arm64_mod_loader.py --sanitize
+          python tools/pc/test_macos_fonts.py --sanitize
+          python tools/pc/test_translated_ir.py --case ir --optimize --sanitize
+          python tools/pc/test_native_call_marshalling.py --sanitize
+          python tools/pc/test_direct_overlay_bridge.py --sanitize
+          python tools/pc/test_libgs_sprite_guest.py --sanitize
+      - name: Source contracts
+        run: make basic-types check-g32
+  sanitizers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends libpng-dev gcc-multilib lld
+      - run: cmake -S . -B tmp/pc -DMEMORIES_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
+      - run: cmake --build tmp/pc
+      - run: python tools/pc/test_path_layout.py --build tmp/pc

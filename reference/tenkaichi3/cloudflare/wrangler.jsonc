@@ -1,0 +1,16 @@
+// The browser build on Cloudflare, locked with a key: bt3.<your-subdomain>.workers.dev (src/worker.js).
+// public/ is made by build.sh from an explicit list plus the owner's disc image in pieces; never point this anywhere
+// else. run_worker_first must stay true: it is what puts the key check in front of every file, the disc included.
+// Deploy from this folder: bash build.sh && npx wrangler@latest deploy
+// The key: npx wrangler@latest secret put BT3_KEY (the link is https://bt3.<your-subdomain>.workers.dev/?k=<key>)
+{
+  "name": "bt3",
+  "account_id": "<your Cloudflare account id>",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true },
+  // online rooms (src/room.js): one Durable Object per room code
+  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }]
+}

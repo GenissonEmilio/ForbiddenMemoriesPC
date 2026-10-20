@@ -1,0 +1,46 @@
+name: Web-port regressions
+
+on:
+  push:
+    branches: [main, web-port, 'codex/**']
+  pull_request:
+    branches: [main, web-port]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-port-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reference-and-import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned Emscripten
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git tmp/ci/emsdk
+          tmp/ci/emsdk/emsdk install 6.0.0
+          tmp/ci/emsdk/emsdk activate 6.0.0
+      - name: Compile and run real WebAssembly regression, cache and Linux packaging tests
+        run: |
+          source tmp/ci/emsdk/emsdk_env.sh
+          python -m unittest discover -s tests/integration -p test_web_reference.py -v
+      - name: Validate local disc importer with synthetic data
+        run: python -m unittest discover -s tests/pc -p test_disc_import.py -v
+      - name: JavaScript and shell syntax
+        run: |
+          node --check reference/tenkaichi3/port/web/serve.mjs
+          node --check reference/tenkaichi3/port/web/net.js
+          node --check reference/tenkaichi3/cloudflare/src/worker.js
+          node --check reference/tenkaichi3/cloudflare/src/room.js
+          bash -n reference/tenkaichi3/cloudflare/build.sh

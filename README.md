@@ -1,4 +1,43 @@
-# Yu-Gi-Oh! Forbidden Memories Recompiled
+# ForbiddenMemoriesPC
+
+Repositório de [GenissonEmilio](https://github.com/GenissonEmilio/ForbiddenMemoriesPC),
+baseado no port nativo de [Unchiga e colaboradores](https://github.com/Unchiga/Yu-Gi-Oh-Forbidden-Memories-Recompiled)
+(base `2d3776e86d075fbbed0605f3c068de86eb0d1651`). A autoria e as licenças originais são preservadas.
+
+## Instalar e jogar no Linux
+
+```sh
+python3 install.py --rom "/caminho/para/seu/Forbidden Memories.rar"
+./play.sh
+```
+
+Aceita o disco americano SLUS-01411 em BIN/IMG e arquivos RAR/ZIP aninhados,
+incluindo RAR com CloneCD (`.ccd`, `.img`, `.sub`). A imagem RAW é validada e copiada
+para `game/rpg-yfm.bin`; o executável precisa corresponder ao SHA-256 da edição suportada.
+O importador não executa documentos ou programas encontrados no arquivo.
+RAR exige `libarchive`; BIN/IMG e ZIP não exigem bibliotecas Python adicionais.
+`python3 install.py --check` verifica as ferramentas. `--play` abre o jogo após a instalação;
+`--skip-test` omite os testes locais de gameplay. A primeira compilação baixa dependências verificadas.
+
+O instalador compila o jogo nativo e valida a entrada na história, o primeiro duelo em duas execuções,
+um duelo completo e save/load determinístico. Os resultados ficam em `tmp/validation/`.
+Disco, arquivos extraídos, saves e resultados locais não são enviados ao GitHub.
+
+## Referência web do Tenkaichi 3
+
+[`reference/tenkaichi3`](reference/tenkaichi3) preserva o código de
+[stufno102/Tenkaichi3Decomp](https://github.com/stufno102/Tenkaichi3Decomp)
+no commit `81507cde58685a6f5aab917c298d9a9f82fe09b0`, com as correções de geração de dados web,
+cache de compilação e preparação Cloudflare em Linux. O workflow `Web-port regressions`
+valida `main`, `web-port` e pull requests com dados sintéticos e WebAssembly real.
+Essa referência é específica de PS2 e continua exigindo o disco do BT3; ela não executa a ROM de PS1.
+O Forbidden Memories deste repositório é o port nativo para PC. Não há build de navegador do Yu-Gi-Oh! aqui.
+
+Veja [proveniência e validação](notes/fork-validation.md). A documentação original segue abaixo.
+
+---
+
+# Yu-Gi-Oh! Forbidden Memories Recompiled (base original)
 
 **Yu-Gi-Oh! Forbidden Memories** (PS1, USA) rebuilt from its decompiled source as a
 native PC game for Windows and Linux, with a macOS ARM64 source build. Bring your own disc image; no game data is
