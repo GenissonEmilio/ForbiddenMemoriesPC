@@ -7,12 +7,15 @@ import re
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tarfile
 
 ROOT=Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "tools/launcher"))
+from model import VERSION
 
 
-def package(version="0.1.0", stage=None):
+def package(version=VERSION, stage=None):
     if not re.fullmatch(r"\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?",version):
         raise ValueError("Version must be a semantic version, such as 0.1.0")
     stage=Path(stage or ROOT / "dist/ForbiddenMemoriesPC")
@@ -85,6 +88,12 @@ Saves e configurações ficam em ~/.local/share/ForbiddenMemoriesPC/player.
 O pacote não contém ROM ou arquivos de disco. O jogo funciona offline.
 
 Teclado: setas, X confirmar, S voltar, Enter Start. F10 abre as configurações.
+Mouse: arraste uma carta para uma das cinco zonas destacadas. Escolha a face
+e clique na estrela guardiã. Soltar fora das zonas cancela o arraste.
+No campo, clique em Sua carta e depois no Alvo para atacar. A barra inferior
+oferece confirmar, voltar, direções, marcar fusão e terminar o turno.
+Os menus iniciais, escolhas de diálogo e slots de saves/decks aceitam cliques.
+Algumas telas originais usam as direções e OK da barra ou o teclado/controle.
 O launcher permanece aberto e volta ao estado pronto quando o jogo termina.
 
 Código e receitas de compilação:
@@ -105,6 +114,6 @@ Port nativo baseado em Unchiga e colaboradores; autoria e licenças preservadas.
 
 if __name__=="__main__":
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version",default="0.1.0")
+    parser.add_argument("--version",default=VERSION)
     parser.add_argument("--stage",type=Path)
     args=parser.parse_args(); package(args.version,args.stage)

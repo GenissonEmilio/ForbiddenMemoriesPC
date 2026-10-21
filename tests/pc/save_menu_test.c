@@ -284,6 +284,18 @@ int main(void)
         SaveMenu_Draw(&canvas, &x, &y, &w, &h);
         assert(w == 600 && x == (1280 - 600) / 2);
         wide_h = h;
+        /* Click a real drawn row: down only selects, release queues the
+         * same load as Cross, through the ordinary I/O path. */
+        {
+            MenuEvent event = {.type=MENU_EVENT_BUTTON_DOWN, .button=1, .x=x+30, .y=y+45};
+            assert(!SaveMenu_Event(&event));
+            assert(!poll(0, 0));
+            event.type=MENU_EVENT_BUTTON_UP;
+            assert(SaveMenu_Event(&event));
+            assert(poll(0, 0)==1);
+            assert(SaveMenu_CurrentSlot()==0);
+        }
+        begin(SAVE_MENU_LOAD, left, NULL, sizeof(left), 0);
         span_left = 370;
         span_right = 910;
         SaveMenu_Draw(&canvas, &x, &y, &w, &h);

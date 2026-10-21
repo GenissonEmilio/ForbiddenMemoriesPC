@@ -10,6 +10,8 @@
  * nothing holds a copy of the deck; the setting `deck_slots` (Game menu)
  * turns it off. */
 struct MenuCanvas; /* pc/platform/menu.h */
+struct MenuEvent;
+int DeckMenu_Event(const struct MenuEvent *event);
 
 /* The menu item and F6. */
 void DeckMenu_Request(void);

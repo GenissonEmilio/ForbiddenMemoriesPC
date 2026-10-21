@@ -32,7 +32,7 @@ apenas para importar RAR. O release empacota essas dependências.
 ```sh
 python3 tools/launcher/main.py
 python3 -m unittest discover -s tests/pc -p test_launcher_model.py -v
-sh tools/launcher/release/build-linux.sh 0.1.0
+sh tools/launcher/release/build-linux.sh
 ```
 
 A geração do release não necessita de ROM. Os testes de interface podem capturar uma

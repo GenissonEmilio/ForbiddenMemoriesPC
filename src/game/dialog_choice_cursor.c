@@ -8,6 +8,9 @@
 #include "sound.h"
 #include "dialog_read_choice_input.h"
 #include "duel_effect.h"
+#ifdef MEMORIES_PC
+#include "pc/platform/game_pointer.h"
+#endif
 
 void Dialog_HighlightChoice(DuelEffectChannel *record)
 {
@@ -35,6 +38,18 @@ void Dialog_HighlightChoice(DuelEffectChannel *record)
    than caching it, and the three reads are what the three branches turn on. */
 s32 Dialog_ReadChoiceInput(DuelEffectChannel *record)
 {
+#ifdef MEMORIES_PC
+    DisplayObject *highlight=record->field_30;
+    if(highlight) {
+        int height=(s16)highlight->field_38.h.field_3A-(s16)highlight->position.h.field_2A;
+        int row=GamePointer_Choice((s16)highlight->position.h.field_28,(s16)highlight->position.h.field_2A,
+            record->field_3E,height>=16?16:12,gDialog_bChoice,gDialog_bChoiceCount,gDialog_bChoiceEnabled);
+        if(row>=0) {
+            gDialog_bChoice=(u8)row;
+            SD_SEPlayFull(6);Dialog_HighlightChoice(record);return 1;
+        }
+    }
+#endif
     if (gInput_wPad1Repeat &
         (PAD_DIRECTION_VERTICAL_MASK | PAD_BUTTON_R1)) {
         if (gInput_wPad1Repeat & PAD_BUTTON_R1) {

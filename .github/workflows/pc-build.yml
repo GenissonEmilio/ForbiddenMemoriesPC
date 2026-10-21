@@ -40,5 +40,9 @@ jobs:
         run: |
           python tools/pc/test_libgs_priority.py
           python tools/pc/test_mod_cache.py
+          gcc -I src tests/pc/pointer_targets_test.c -o tmp/pointer-targets-test
+          tmp/pointer-targets-test
+          gcc -std=c99 -Wall -Wextra -Wpedantic -Werror -I src -I tests/pc tests/pc/save_menu_test.c src/pc/saves/save_menu.c src/pc/saves/save_slots.c src/pc/platform/paths.c -o tmp/save-menu-test
+          tmp/save-menu-test
       - name: Disc import regressions with synthetic data
         run: python -m unittest discover -s tests/pc -p test_disc_import.py -v

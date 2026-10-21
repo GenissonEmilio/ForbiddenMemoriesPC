@@ -11,6 +11,7 @@
 #include "platform.h"
 #include "paths.h"
 #include "menu.h"
+#include "game_pointer.h"
 #include "pc/saves/deck_menu.h"
 #include "pc/render/present_pass.h"
 #include "mods_window.h"
@@ -1260,7 +1261,7 @@ static void relayout(void)
     }
     update_menu_scale(window_h);
     menu = menu_visible && !bar_overlays() ? Menu_Height() : 0;
-    area_h = window_h - menu;
+    area_h = window_h - menu - GamePointer_Height();
     if (area_h < 1) area_h = 1;
     layout.win_w = window_w;
     layout.win_h = window_h;
@@ -1294,6 +1295,10 @@ static void relayout(void)
         layout.dst.x = (float)(window_w - pw * k) * 0.5f;
         layout.dst.y = (float)menu + (float)(area_h - ph * k) * 0.5f;
     }
+    GamePointer_Viewport(layout.dst.x, layout.dst.y, layout.dst.w, layout.dst.h,
+                        Platform_Widescreen() ? 426 : logical_w, window_w, window_h);
+    LOG(LOG_WINDOW,"mouse viewport %.2f %.2f %.2f %.2f game %d",layout.dst.x,layout.dst.y,layout.dst.w,layout.dst.h,
+        Platform_Widescreen()?426:logical_w);
     if (overlay && (canvas.width != window_w || canvas.height != window_h)) {
         SDL_DestroyTexture(overlay);
         overlay = NULL;
@@ -1576,6 +1581,7 @@ static void draw_overlay(int *x, int *y, int *w, int *h)
         Menu_Draw(&canvas);
         Hud_Draw(&canvas);
     }
+    GamePointer_Draw(&canvas);
     Menu_Bounds(x, y, w, h);
     Hud_Bounds(&hx, &hy, &hw, &hh);
     if (tw && th) {
@@ -1588,6 +1594,7 @@ static void draw_overlay(int *x, int *y, int *w, int *h)
             hh = y1 - hy;
         }
     }
+    if (GamePointer_Height()) { *x=0;*y=0;*w=layout.win_w;*h=layout.win_h; }
     if (!*w || !*h) { *x = hx; *y = hy; *w = hw; *h = hh; return; }
     if (hw && hh) {
         int x1 = *x + *w > hx + hw ? *x + *w : hx + hw;
@@ -2042,6 +2049,7 @@ static void pump(void)
         if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_F10) menu_reveal_frames = 120;
         update_menu_visibility();
         if (menu_event.type != MENU_EVENT_NONE && Menu_Event(&menu_event, &quit)) {
+            GamePointer_Reset();
             static unsigned logged;
             if (current_frame - logged >= 30) {
                 logged = current_frame;
@@ -2049,6 +2057,25 @@ static void pump(void)
             }
             menu_dirty = 1;
             continue;
+        }
+        if(SaveMenu_Event(&menu_event) || DeckMenu_Event(&menu_event)) {
+            GamePointer_Reset();menu_dirty=1;continue;
+        }
+        if (!Menu_IsOpen() && !Menu_NoticeShown() &&
+            GamePointer_Event(&menu_event)) {
+            if(GamePointer_WantsCard()) {
+                if(pass_shown.valid) {
+                    uint32_t *pixels=malloc((size_t)pass_shown.w*pass_shown.h*4);
+                    if(pixels) {
+                        es_enter();
+                        int read=GlPicture_ReadShown(pass_shown.texture,pass_shown.x,pass_shown.y,pass_shown.w,pass_shown.h,pixels);
+                        es_leave();
+                        if(read)GamePointer_CaptureCard(pixels,pass_shown.w,pass_shown.h);
+                        free(pixels);
+                    }
+                } else GamePointer_CaptureCard(picture_pixels,picture_w,picture_h);
+            }
+            menu_dirty=1; continue;
         }
         switch (event.type) {
         /* Closing the main window (its button, Alt+F4) asks, like File >
@@ -2074,6 +2101,7 @@ static void pump(void)
             update_display_refresh();
             break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
+            GamePointer_Reset();
             if(!controls_window)ControlsRuntime_ResetKeys(); mouse_bits=wheel_now=0;wheel_frames=0;
             if (Settings_Get(SET_MUTE_ON_FOCUS_LOSS)) Spu_SetOutputVolume(0);
             if (Settings_Get(SET_PAUSE_ON_FOCUS_LOSS) && Platform_ClockRate() != 0) {
@@ -2097,6 +2125,9 @@ static void pump(void)
             break;
         case SDL_EVENT_GAMEPAD_ADDED: open_gamepad(event.gdevice.which); break;
         case SDL_EVENT_GAMEPAD_REMOVED: close_gamepad(event.gdevice.which); break;
+        case SDL_EVENT_GAMEPAD_BUTTON_DOWN: case SDL_EVENT_GAMEPAD_BUTTON_UP:
+            GamePointer_Reset();
+            break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN: case SDL_EVENT_MOUSE_BUTTON_UP:
             if (event.button.y >= Menu_Height() && menu_event.button >= 2 && menu_event.button <= 3) {
                 mouse_bits = event.type == SDL_EVENT_MOUSE_BUTTON_DOWN
@@ -2111,6 +2142,7 @@ static void pump(void)
             }
             break;
         case SDL_EVENT_KEY_DOWN: case SDL_EVENT_KEY_UP: {
+            GamePointer_Reset();
             SDL_Keycode key = event.key.key;
             int down = event.type == SDL_EVENT_KEY_DOWN;
             /* The shortcuts are the Game list's bindings (host_actions.c,
@@ -2797,13 +2829,13 @@ void HERE(Platform_PumpEvents)(void)
 
 uint16_t Platform_Pad(int port)
 {
-    return port == 0 ? (uint16_t)(ControlsRuntime_Keyboard() | (ControlsRuntime_Blocked()?0:(mouse_bits | wheel_now | touch_bits)) | scripted_bits | Gamepad_Bits(0))
+    return port == 0 ? (uint16_t)(ControlsRuntime_Keyboard() | (ControlsRuntime_Blocked()?0:(mouse_bits | wheel_now | touch_bits | GamePointer_Bits())) | scripted_bits | Gamepad_Bits(0))
                      : (uint16_t)(Gamepad_Bits(1) | scripted_bits2);
 }
 
 uint16_t Platform_PadFixedBits(int port)
 {
-    return port == 0 ? (uint16_t)((ControlsRuntime_Blocked()?0:(mouse_bits | wheel_now | touch_bits)) | scripted_bits) : scripted_bits2;
+    return port == 0 ? (uint16_t)((ControlsRuntime_Blocked()?0:(mouse_bits | wheel_now | touch_bits | GamePointer_Bits())) | scripted_bits) : scripted_bits2;
 }
 
 int Platform_PadConnected(int port) { return port == 0 || Gamepad_Connected(port) || Platform_ScriptedPad2(); }
@@ -2818,9 +2850,25 @@ static void run_event_script(unsigned frame)
 {
     static const char *script;
     static int loaded;
+    static char from_file[4096], previous_file[4096];
     if (!loaded) {
         loaded = 1;
         script = getenv("MEMORIES_SDL_SCRIPT");
+    }
+    /* Local interactive regression driver: the same SDL event queue as a
+     * real mouse, while the control channel advances the game by state.
+     * Each atomically replaced file is consumed once; no file is consulted
+     * unless this explicit test environment variable was supplied. */
+    if (!script || !*script) {
+        const char *path=getenv("MEMORIES_SDL_SCRIPT_FILE");
+        FILE *input=path&&*path?fopen(path,"r"):NULL;
+        if(input) {
+            size_t bytes=fread(from_file,1,sizeof(from_file)-1,input);
+            fclose(input);from_file[bytes]=0;
+            if(strcmp(from_file,previous_file)) {
+                memcpy(previous_file,from_file,bytes+1);script=from_file;
+            }
+        }
     }
     while (script && *script) {
         char *end, kind[8];
@@ -2890,7 +2938,7 @@ static void run_event_script(unsigned frame)
             event.motion.y = (float)y;
             event.motion.windowID = SDL_GetWindowID(window);
             SDL_PushEvent(&event);
-            if (strcmp(kind, "click") == 0) {
+            if (strcmp(kind, "click") == 0 || strcmp(kind,"press")==0 || strcmp(kind,"release")==0) {
                 memset(&event, 0, sizeof(event));
                 event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
                 event.button.button = SDL_BUTTON_LEFT;
@@ -2899,10 +2947,10 @@ static void run_event_script(unsigned frame)
                 event.button.x = (float)x;
                 event.button.y = (float)y;
                 event.button.windowID = SDL_GetWindowID(window);
-                SDL_PushEvent(&event);
+                if(strcmp(kind,"release")) SDL_PushEvent(&event);
                 event.type = SDL_EVENT_MOUSE_BUTTON_UP;
                 event.button.down = false;
-                SDL_PushEvent(&event);
+                if(strcmp(kind,"press")) SDL_PushEvent(&event);
             }
         }
         if (*script == ',') {
@@ -2986,6 +3034,9 @@ void HERE(Platform_Frame)(unsigned frame)
     wheel_now = wheel_frames > 0 && wheel_frames-- ? wheel_bits : 0;
     scripted_bits = Platform_ScriptedBits(frame);
     scripted_bits2 = Platform_ScriptedBits2(frame);
+    GamePointer_Frame(frame, ControlsRuntime_Blocked() || Menu_IsOpen() || Menu_NoticeShown() ||
+                      Panel_Shown());
+    if (GamePointer_Dirty()) menu_dirty=1;
 }
 
 #ifdef SDL_PLATFORM_ANDROID

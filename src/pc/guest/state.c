@@ -22,6 +22,7 @@
 #include "pc/text/text.h"
 #include "pc/platform/menu.h"
 #include "pc/platform/title_screen.h"
+#include "pc/platform/game_pointer.h"
 #include "pc/debug/crash.h"
 #include "pc/debug/log.h"
 #include "pc/tower/tower.h"
@@ -562,6 +563,7 @@ static void apply(void)
     Spu_Hold(0);
     Mods_Reset(); /* another game: whatever the mods were holding is not it */
     AudioReplace_StateLoaded(); /* replacement sounds are not in the state: the song restarts */
+    GamePointer_Reset(); /* no mouse gesture crosses into another saved game */
     {
         MemoriesModEvent event = {MEMORIES_EVENT_LOAD, MEMORIES_AFTER, 0, 0, 0, 0, 0};
         Mods_Dispatch(&event);

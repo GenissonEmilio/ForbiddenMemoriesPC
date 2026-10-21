@@ -3,6 +3,7 @@
 #include "flow_text.h"
 #include "pc/guest/state.h"
 #include "pc/platform/settings.h"
+#include "pc/platform/pointer_targets.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -31,6 +32,8 @@ static struct {
 } menu = {VIEW_CLOSED, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", NULL, NULL, 0, -1, {-1, -1}, 0, {{0}}};
 
 static SaveSlotCheck check;
+static unsigned mouse_pressed;
+static PointerTargets mouse_targets;
 static int shown_rows = SAVE_SLOT_COUNT; /* how many rows the last draw had room for */
 /* Under a failed save's message: where and why (SaveSlots_LastError). Kept
  * out of `menu`, whose bytes save states carry, so their layout stays. */
@@ -228,12 +231,24 @@ int SaveMenu_Begin(int step, unsigned char *buffer, unsigned char *second, int s
 }
 
 int SaveMenu_Active(void) { return menu.view != VIEW_CLOSED; }
+int SaveMenu_Event(const MenuEvent *event)
+{
+    int hit;
+    if(!SaveMenu_Active()) return 0;
+    hit=PointerTargets_Event(&mouse_targets,event,menu.view);
+    if(hit<0) return 0;
+    if(menu.view==VIEW_LIST && hit<SAVE_SLOT_COUNT) menu.cursor=hit;
+    else if(menu.view==VIEW_CONFIRM && hit>=100 && hit<102) menu.choice=hit-100;
+    else if(menu.view!=VIEW_MESSAGE) return 0;
+    mouse_pressed|=SAVE_MENU_PAD_CONFIRM;changed();return 1;
+}
 int SaveMenu_CurrentSlot(void) { return menu.current_slot; }
 int SaveMenu_PairSlot(int side) { return side == 0 || side == 1 ? menu.pair_slot[side] : -1; }
 
 int SaveMenu_Poll(unsigned pressed, int channel, int *sound, SaveSlotCheck validity)
 {
     int slot;
+    pressed|=mouse_pressed;mouse_pressed=0;
     check = validity;
     *sound = SAVE_MENU_SOUND_NONE;
     if (menu.view == VIEW_CLOSED) return 2;
@@ -531,6 +546,7 @@ static void draw_confirm(MenuCanvas *canvas, int px, int pw, int cy, int s)
         for (i = 0; i < 2; i++) {
             int chosen = i == menu.choice, left = bx + i * (bw + 16 * s);
             fill(canvas, left, top - line_h / 2 + 8 * s, bw, 24 * s, chosen ? 0x3a5aa8u : 0x22263au, 255);
+            PointerTargets_Add(&mouse_targets,100+i,left,top-line_h/2+8*s,bw,24*s);
             centred(canvas, left, bw, top - line_h / 2 + 20 * s, labels[i], chosen ? COLOR_TEXT : COLOR_DIM);
         }
         return;
@@ -545,6 +561,7 @@ static void draw_confirm(MenuCanvas *canvas, int px, int pw, int cy, int s)
         int chosen = i == menu.choice;
         int left = bx + i * (bw + 16 * s);
         fill(canvas, left, y + 96 * s, bw, 24 * s, chosen ? 0x3a5aa8u : 0x22263au, 255);
+        PointerTargets_Add(&mouse_targets,100+i,left,y+96*s,bw,24*s);
         centred(canvas, left, bw, y + 108 * s, labels[i], chosen ? COLOR_TEXT : COLOR_DIM);
     }
 }
@@ -554,6 +571,7 @@ void SaveMenu_Draw(MenuCanvas *canvas, int *x, int *y, int *w, int *h)
     int s, row_h, rows, pw, ph, px, py, top, i, list_y, left, right, bar, layout, line_h = 0, hint_lines = 1;
     char line[160], details[128];
     *x = *y = *w = *h = 0;
+    PointerTargets_Begin(&mouse_targets,menu.view);
     if (menu.view == VIEW_CLOSED || !menu.started || !canvas || !canvas->pixels) return;
     /* The free width: the window's, or between the touch controls while
      * they show (they play this menu). Each slot on one row when that is
@@ -592,9 +610,11 @@ void SaveMenu_Draw(MenuCanvas *canvas, int *x, int *y, int *w, int *h)
     frame(canvas, px, py, pw, ph, s);
     draw_text(canvas, px + 14 * s, py + 20 * s, title(), COLOR_TITLE);
     list_y = py + 38 * s;
+    if(menu.view==VIEW_MESSAGE) PointerTargets_Add(&mouse_targets,200,px,py,pw,ph);
     top = menu.top;
     for (i = 0; i < rows && top + i < SAVE_SLOT_COUNT; i++) {
         int slot = top + i, ry = list_y + i * row_h, cy = ry + row_h / 2;
+        if(menu.view==VIEW_LIST) PointerTargets_Add(&mouse_targets,slot,px+6*s,ry,pw-12*s,row_h);
         const SaveSlotInfo *info = &menu.slots[slot];
         uint32_t color = selectable(slot) ? COLOR_TEXT : COLOR_DIM;
         uint32_t right_color =
@@ -662,6 +682,7 @@ void SaveMenu_State(MemoriesState *state)
 {
     MemoriesStateField fields[] = {{&menu, sizeof(menu)}};
     int loaded = Memories_StateChunk(state, "save-menu", fields, 1);
+    if(loaded) {mouse_pressed=0;mouse_targets.down=-1;mouse_targets.count=0;}
     if (loaded) detail[0] = '\0'; /* it went with the message shown before */
     if (loaded && menu.view == VIEW_CONFIRM) {
         /* The slot may have changed since this prompt was saved. Return

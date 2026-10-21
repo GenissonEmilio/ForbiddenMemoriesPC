@@ -8,7 +8,7 @@ baseado no port nativo de [Unchiga e colaboradores](https://github.com/Unchiga/Y
 
 **A forma recomendada é o [release gráfico para Linux](https://github.com/GenissonEmilio/ForbiddenMemoriesPC/releases).**
 
-1. Baixe `ForbiddenMemoriesPC-0.1.0-linux-x86_64.tar.gz` e extraia a pasta inteira.
+1. Baixe `ForbiddenMemoriesPC-0.2.0-linux-x86_64.tar.gz` e extraia a pasta inteira.
 2. Abra o executável **ForbiddenMemoriesPC** com dois cliques.
 3. Clique em **Escolher arquivo…**, selecione sua ROM e aguarde a preparação.
 4. Clique em **Iniciar jogo**. Nas próximas sessões, sua ROM já estará lembrada.
@@ -20,6 +20,26 @@ glibc 2.35+ (Ubuntu 22.04+, Debian 12+, Fedora atual), sessão gráfica e OpenGL
 O pacote não contém ROM. O launcher funciona offline e mantém os saves na pasta do usuário.
 
 ![Interface do launcher Linux](docs/launcher-linux.png)
+
+### Jogar com o mouse
+
+Passe o mouse sobre as cartas da mão para selecioná-las. Arraste uma carta para
+uma das cinco zonas **Soltar**; escolha a face e clique na estrela guardiã.
+Soltar fora das zonas cancela o arraste. Também é possível clicar na carta e
+escolher a zona depois.
+
+No campo, os botões **Carta 1–5** selecionam seu monstro; **Alvo 1–5** escolhem o
+alvo, da esquerda para a direita na visão do jogador. O jogo mantém as regras de
+ataque e posição. A barra inferior oferece voltar, confirmar, direções, marcar
+fusão e terminar o turno. Para uma fusão, selecione e marque cada carta com
+**Fusão**, depois pressione **OK**.
+
+O menu inicial, as escolhas de diálogo e as listas de saves/decks aceitam cliques
+diretos. Nas demais telas originais, use as direções e **OK** da barra, o teclado
+ou controle. Teclado e controle continuam disponíveis durante o jogo.
+Veja [implementação e validação](notes/mouse-controls.md).
+
+![Arraste de carta com destinos de coluna e controles para mouse](docs/mouse-controls-linux.png)
 
 ### Compilar a partir do código-fonte
 
@@ -56,7 +76,7 @@ O código do launcher está em [`tools/launcher`](tools/launcher), com sua próp
 Para gerar o mesmo pacote Linux com Docker:
 
 ```sh
-sh tools/launcher/release/build-linux.sh 0.1.0
+sh tools/launcher/release/build-linux.sh
 ```
 
 O workflow **Linux desktop launcher** compila o pacote sem ROM e testa a interface em

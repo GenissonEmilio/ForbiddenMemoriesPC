@@ -4,6 +4,7 @@
 #include "flow_text.h"
 #include "pc/platform/button_layout.h"
 #include "pc/platform/menu.h"
+#include "pc/platform/pointer_targets.h"
 #include "deck_slots.h"
 #include "save_menu.h"
 #include "save_slots.h"
@@ -78,6 +79,20 @@ static struct {
 
 static int requested, allowed, holding, item_enabled = -1, shown_rows = DECK_SLOT_COUNT;
 static unsigned last_poll = 0xffffff00u, previous_bits;
+static unsigned mouse_pressed;
+static PointerTargets mouse_targets;
+
+int DeckMenu_Event(const MenuEvent *event)
+{
+    int hit;
+    if(!DeckMenu_Active()) return 0;
+    hit=PointerTargets_Event(&mouse_targets,event,menu.view);
+    if(hit<0) return 0;
+    if(menu.view==VIEW_LIST && hit<DECK_SLOT_COUNT) menu.cursor=hit;
+    else if(menu.view==VIEW_CONFIRM && hit>=100 && hit<102) menu.choice=hit-100;
+    else if(menu.view!=VIEW_MESSAGE) return 0;
+    mouse_pressed|=PAD_CROSS;menu.changes++;return 1;
+}
 
 /* --- the decks: a draft beside the save -----------------------------------
  * The slots of the save being played (its duelist code) are a draft. Using
@@ -328,6 +343,7 @@ void DeckMenu_State(MemoriesState *state)
     MemoriesStateField field = {&draft, sizeof(draft)};
     int loaded = Memories_StateChunk(state, "deck-slots", &field, 1);
     if (Memories_StateLoading(state)) {
+        mouse_pressed=0;mouse_targets.down=-1;mouse_targets.count=0;
         if (!loaded) draft.code = 0; /* older state: read the file again */
         else draft.dirty = 1; /* the file may have changed since this snapshot */
         seen_saves = SaveMenu_SaveCount();
@@ -627,6 +643,7 @@ void DeckMenu_Poll(int where)
     allowed = Settings_Get(SET_DECK_SLOTS) && game_loaded() && !SaveMenu_Active() && screen_allowed(where);
     bits = pad_bits();
     pressed = bits & ~previous_bits;
+    pressed|=mouse_pressed;mouse_pressed=0;
     previous_bits = bits;
     /* The not-ready confirm answered with a return to the deck: no list. */
     if (list_after_build_deck && build_deck_idle()) list_after_build_deck = 0;
@@ -849,6 +866,7 @@ void DeckMenu_Draw(MenuCanvas *canvas, int *x, int *y, int *w, int *h)
     const int jp = Settings_Get(SET_JP_BUTTONS);
     char line[160];
     *x = *y = *w = *h = 0;
+    PointerTargets_Begin(&mouse_targets,menu.view);
     if (menu.view == VIEW_CLOSED || !canvas || !canvas->pixels) return;
     /* The free width: the window's, or between the touch controls while
      * they show (they play this menu). Each slot on one row when that is
@@ -877,6 +895,7 @@ void DeckMenu_Draw(MenuCanvas *canvas, int *x, int *y, int *w, int *h)
     px = left + (right - left - pw) / 2;
     py = bar + (canvas->height - bar - ph) / 2;
     frame_box(canvas, px, py, pw, ph, s);
+    if(menu.view==VIEW_MESSAGE) PointerTargets_Add(&mouse_targets,200,px,py,pw,ph);
     if (menu.view == VIEW_MESSAGE && menu.close_after) {
         /* Opened where it cannot be used: only the message, on lines of
          * its own where the box is narrower than it. */
@@ -891,6 +910,7 @@ void DeckMenu_Draw(MenuCanvas *canvas, int *x, int *y, int *w, int *h)
     list_y = py + 38 * s;
     for (i = 0; i < rows && menu.top + i < DECK_SLOT_COUNT; i++) {
         int slot = menu.top + i, ry = list_y + i * row_h, cy = ry + row_h / 2;
+        if(menu.view==VIEW_LIST) PointerTargets_Add(&mouse_targets,slot,px+6*s,ry,pw-12*s,row_h);
         const char *status = status_text(slot);
         uint32_t color = draft.slots[slot].used ? COLOR_TEXT : COLOR_DIM;
         uint32_t right_color = menu.current[slot] ? COLOR_CURRENT
@@ -937,6 +957,7 @@ void DeckMenu_Draw(MenuCanvas *canvas, int *x, int *y, int *w, int *h)
         for (i = 0; i < 2; i++) {
             int chosen = i == menu.choice, left = bx + i * (bw + 16 * s);
             fill(canvas, left, by + 62 * s, bw, 24 * s, chosen ? 0x3a5aa8u : 0x22263au, 255);
+            PointerTargets_Add(&mouse_targets,100+i,left,by+62*s,bw,24*s);
             centred(canvas, left, bw, by + 74 * s, labels[i], chosen ? COLOR_TEXT : COLOR_DIM);
         }
     } else if (menu.view == VIEW_MESSAGE) {

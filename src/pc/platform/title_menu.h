@@ -37,6 +37,9 @@ int TitleMenu_Reopen(int selection, int reopen);
 void TitleMenu_State(struct MemoriesState *state);
 /* Whether a menu is up (not PUSH START BUTTON); 0 or 1, which. -1 none. */
 int TitleMenu_Showing(void);
+/* Click a visible item at its actual mod/scaled/widescreen position.
+ * 1 selected, -1 menu background, 0 no interactive title menu. */
+int TitleMenu_Point(int x, int y);
 /* The name of item `index` ("load", "my-mod:credits"), or NULL: for the
  * mods' MEMORIES_EVENT_MENU. */
 const char *TitleMenu_ItemName(int index);

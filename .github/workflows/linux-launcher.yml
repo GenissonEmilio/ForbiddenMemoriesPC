@@ -46,7 +46,7 @@ jobs:
             tmp/pc/tools
           key: launcher-linux-${{ hashFiles('tools/pc/build_linux_sysroot.py', 'tools/pc/fetch_tools.py') }}
       - name: Build the complete standalone Linux release without a ROM
-        run: sh tools/launcher/release/build-linux.sh 0.1.0
+        run: sh tools/launcher/release/build-linux.sh
       - name: GUI starts on a clean Linux without Python or GTK installed
         run: |
           docker build -f tools/launcher/release/Test.Dockerfile -t forbidden-memories-clean tools/launcher/release

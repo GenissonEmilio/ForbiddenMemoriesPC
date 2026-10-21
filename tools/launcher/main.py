@@ -217,7 +217,7 @@ class Launcher:
     def controls(self):
         page=box(spacing=24)
         page.pack_start(label("Pronto para duelar?", "section-title"),False,False,0)
-        page.pack_start(label("Jogue no teclado ou conecte seu controle USB/Bluetooth.\nNo jogo, F10 abre as configurações e permite trocar os botões.","muted",wrap=True),False,False,0)
+        page.pack_start(label("Arraste uma carta para as zonas destacadas e escolha a face e a estrela.\nNo campo, clique em Sua carta e depois no Alvo para atacar.\nA barra inferior permite confirmar, voltar, marcar fusões e terminar o turno.\n\nMenus iniciais, diálogos e slots de saves/decks aceitam cliques.\nNas demais telas, use as direções e OK da barra, o teclado ou seu controle.\nF10 abre as configurações e permite trocar os botões.","muted",wrap=True),False,False,0)
         grid=Gtk.Grid(column_spacing=28,row_spacing=15); style(grid,"panel")
         rows=[("↑ ↓ ← →","Mover / escolher"),("X","Confirmar · botão ✕"),("S","Voltar · botão ○"),
               ("Z / A","Botões □ / △"),("Enter","Start"),("Q / W","L1 / R1"),("E / R","L2 / R2"),

@@ -297,6 +297,29 @@ static int waiting(void)
            !D_8018459D && run.leaving < 0 && !Menu_NoticeShown() && entry(base_of(menu_of(gMain_bMenuID)));
 }
 
+int TitleMenu_Point(int x, int y)
+{
+    int menu, row;
+    if (!waiting()) return 0;
+    menu = menu_of(gMain_bMenuID);
+    for (row = 0; row < config()->shown[menu]; row++) {
+        int item = config()->order[menu][row], w = 144, h = 16;
+        const TitleItem *it = &config()->items[item];
+        TitleImages_Ready(TITLE_IMAGE_ITEM(item, 0), &w, &h);
+        if (w <= 0) w = 144;
+        if (h <= 0) h = 16;
+        /* Ready images are already scaled by TitleImages. Retail sprites
+         * have their scale applied by draw_sized instead. */
+        if (!drawn_here(item)) { w = w * it->scale / 100; h = h * it->scale / 100; }
+        if (x < run.x[item] - w/2 || x >= run.x[item] + w/2 ||
+            y < item_y(it) - h/2 || y >= item_y(it) + h/2) continue;
+        run.cursor[menu] = row;
+        settle(menu);
+        return 1;
+    }
+    return -1;
+}
+
 unsigned TitleMenu_Before(void)
 {
     static int notice;
